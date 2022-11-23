@@ -1,0 +1,79 @@
+﻿@page "/products"
+@inherits FluxorComponent
+@inject HttpClient Http
+@inject IDispatcher _dispatcher
+@inject IState<ProductsState> _productsState
+
+<PageTitle>Products</PageTitle>
+
+<h1>Product Overview</h1>
+
+<div class="card mb-3">
+    <div class="card-header">Filter</div>
+    <div class="card-body">
+        <EditForm Model="_selectedCategory">
+            <InputSelect Value="_selectedCategory" ValueExpression="@(()=>_selectedCategory)" ValueChanged="@((string value) => OnFilterChanged(value))" class="form-control">
+                <option value="all">-</option>
+                <option value="smartphones">Smartphones</option>
+                <option value="laptops">Laptops</option>
+                <option value="skincare">Skincare</option>
+                <option value="groceries">Groceries</option>
+            </InputSelect>
+        </EditForm>
+    </div>
+</div>
+
+@if (_productsState.Value.IsLoading)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table" style="height:150px;">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Price</th>
+                <th>Category</th>
+            </tr>
+        </thead>
+        <tbody>
+            <Virtualize ItemsProvider="@ProvideElements" Context="product">
+                <tr>
+                    <td>@product.Title</td>
+                    <td>@product.Price</td>
+                    <td>@product.Category</td>
+                </tr>
+            </Virtualize>
+        </tbody>
+    </table>
+}
+
+@code {
+    private string _selectedCategory = "all";
+
+    protected override async Task OnInitializedAsync()
+    {
+        FetchProducts();
+    }
+
+    async ValueTask<ItemsProviderResult<Product>> ProvideElements(ItemsProviderRequest request)
+    {
+        var taskSource = new TaskCompletionSource<ProductResponse>();
+        _dispatcher.Dispatch(new ProductsStateFetchProductsAction(taskSource, _selectedCategory, request.StartIndex, request.Count));
+        var productResponse = await taskSource.Task;
+        return new ItemsProviderResult<Product>(productResponse.Products, productResponse.Total);
+    }
+
+    private void OnFilterChanged(string value)
+    {
+        _selectedCategory = value;
+        FetchProducts();
+    }
+
+    private void FetchProducts()
+    {
+        var taskSource = new TaskCompletionSource<ProductResponse>();
+        _dispatcher.Dispatch(new ProductsStateFetchProductsAction(taskSource, _selectedCategory, 0, 10)); 
+    }
+}
